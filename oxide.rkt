@@ -55,7 +55,11 @@
      (tup e ...)              ; (e1, ..., en)
      (arr e ...)              ; [e1, ..., en]
      (letrgn [r] e)           ; letrng<r> { e }
-     (let x τ e)              ; let x : τ^si = e1        TODO(e2)
+     ;; We spell `let` as `define` to be more lispy
+     ;;  (let in lisp has certain meaning, and editors (parinfer)
+     ;;   dont like it when you use it wrong)
+     (define x τ e)           ; let x : τ^si = e1
+
      ; Scoping: lambdas only have one arg
      (λ τ (x τ) e)            ; |x: τ| → τ_r { e }
      ; TODO: 𝑒𝑓 ::<Φ , 𝜌 , 𝜏si> (𝑒1 , . . . , 𝑒𝑛)
