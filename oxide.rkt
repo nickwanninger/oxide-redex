@@ -75,19 +75,78 @@
             (Left x e)
             (Right x e)))      ; match e { Left(x) ⇒ e, Right(x) ⇒ e }
 
-  ;; Regions: 'x, 'y. Except in this we just use the
-  ;; syntactic location instead of requiring a tick
-  (r ::= variable-not-otherwise-mentioned)
+
+  ;; Polymorphicc variables
+  ;;    Its not clear if Λ is the right thing here.
+  (poly-vars ::= (Λ [φ...] [ϱ ...] [tyvar ...]))
+  ;; Kinds (types of types)
+  (κ ::= * RGN FRM)
+  ;; Base Types
+  (τB := bool u32 unit)
+  ;; Sized Types
+  (τSI ::= τB tyvar (& p ω τXI)
+       (tup τSI ...)
+       (arr τSI n)
+       (Either τSI τSI)
+       ;; Polymorphic function types (SCOPING: only one argument)
+       (∀ poly-vars
+          (τSI)
+          τSI
+          #:where (ϱ : ϱ) ...))
+
+  ;; Maybe unsized Types
+  (τXI ::= τSI (arr τSI))
+  ;; Dead Types
+  (τSD ::= τSI† (tup τSD ...))
+  ;; Maybe Dead Types
+  (τSX ::= τSI τSD (tup τSX ...))
+  ;; Types
+  (τ ::= τXI τSX)
+
+
+  ;; Global Environment
+  (Σ ::= · (Σ ε))
+  (ε ::= (fn f poly-vars (x τSI → τSI) #:where (ϱ : ϱ) e))
+  ;; Type Environment
+  (Δ ::=
+     ·
+     (Δ tyvar : *)
+     (Δ ϱ : RGN)
+     (Δ φ : FRM)
+     (Δ ϱ :> ϱ))
+
+  ;; Continuation Typing
+  (Θ ::= · (Θ τSI))
+  ;; Stack Typing
+  (Γ ::= · (Γ ♮ F))
+  (F ::= · (F x : τSX) (F r ↦ {ℓ ...}))
+  (Φ ::= φ F)
+
 
   ;; A shorter way to spell number
   (n ::= number)
 
   ;; Variables
-  (x ::= variable-not-otherwise-mentioned))
+  (x ::= variable-not-otherwise-mentioned)
+  ;; Function name
+  (f ::= variable-not-otherwise-mentioned)
+  ;; Type vars (try to type these in greek)
+  (tyvar ::= variable-not-otherwise-mentioned)
+  ;; Regions: 'x, 'y. Except in this we just use the
+  ;; syntactic location instead of requiring a tick
+  (r ::= variable-not-otherwise-mentioned)
+  ;; Frame Vars
+  (φ ::= variables-not-otherwise-mentioned))
 
 
+
+;; First example, immediately after fig1 in the paper
 (term
- (letrgn [x]
-    (do (let x (Point 1 2))
-        (let z (& x shrd x)))))
+ (letrgn [x y]
+         (do (define pt (Point 6 9))
+             (define x (& x uniq (dot pt 0)))
+             (define y (& x uniq (* x))))))
+
+              
+         
 
