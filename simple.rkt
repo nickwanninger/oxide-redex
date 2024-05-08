@@ -111,15 +111,12 @@
 (test-judgment-holds (⊢ () (letvar x @ p : int = 1) any int))
 (test-judgment-holds (⊢ () (letvar x @ p : bool = false) any bool))
 
-(test-equal?
- "negative test for type check"
+(test-equal
  (judgment-holds (⊢ () (letvar x @ p : int = false) any int))
  #false)
 
-(test-equal?
- "negative test for type check"
+(test-equal
  (judgment-holds (⊢ () (letvar x @ p : int = false) any bool))
  #false)
-
 
 (test-results)
