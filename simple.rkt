@@ -17,16 +17,16 @@
      (& r ω x)
 
      ;; Variable binding.
-     (letvar x : t = e) ;; bind x of type τ to the result of e, place at ρ
-     (x : t = e)
+     (letvar x : t = e e) ;; bind x of type τ to the result of e, place at ρ
+     ;; (x : t = e)
 
      ;; Region binding.
      (letrgn [r] e)
      
      ;; Structured control flow
-     {e e ...} ;; sequencing, racket doesnt like ;
-     ;; (if e e e)   ;; predication
-     ;; (while e e)  ;; recursion
+     (if e e e)   ;; predication, "the only interesting thing"
+     ;;                             -Christos Dimoulas, Ph.D.
+     ;;                               5/9/2024
      )
 
   ;; Constants
@@ -36,28 +36,26 @@
   ;; Place expressions.
   (p ::=
      x     ;; variable
-     ;; (* p) ;; dereference
+     (* p) ;; dereference
      ;; (. p i) ;; tuple indexing
      )
 
   ;; Variables.
   (x ::= variable-not-otherwise-mentioned)
 
-  ;; Provenance
+  ;; Region
   (ρ ::=
-     r ;; concrete provenance
-     ϱ ;; abstract provenance
+     r ;; concrete region
+     ϱ ;; abstract region
      )
-  ;; Concrete provenance variables.
+  ;; Concrete region variables.
   (r ::= variable-not-otherwise-mentioned)
-  ;; Abstract provenance variables.
+  ;; Abstract region variables.
   (ϱ ::= variable-not-otherwise-mentioned)
 
 
   ;; Ownership qualifiers.
   (ω ::= shared unique)
-
-  ;; References.
 
   ;; Types
   (t ::=
@@ -72,7 +70,7 @@
 
 
   #:binding-forms
-  (letvar x : t = e) #:exports x
+  (letvar x : t = e e #:refers-to x)
   (letrgn [r] e #:refers-to r)
   )
 
@@ -80,7 +78,12 @@
 
 ;; Extended language for the typechecker.
 (define-extended-language Simple+Γ Simple
-  (Γ ::= ((x t) ...))
+  (Γ  ::= (Γv Γr))
+  (Γv ::= ((x : t) ...))
+  (Γr ::= ((r ↦ loans) ...))
+  (loans ::= {(ω p) ...})
+      
+               
   )
 
 (define-judgment-form Simple+Γ
@@ -100,7 +103,7 @@
    (⊢ Γ false bool Γ)]
 
   [----------------------- "variable"
-   (⊢ Γ x (lookup x Γ) Γ)]
+   (⊢ Γ x (lookup-var x Γ) Γ)]
 
   [ ;; TODO: the hard part :3
    ;; Γ(r) = ∅
@@ -110,26 +113,18 @@
    ----------------- "borrow"
    (⊢ Γ (& r ω x) (& r ω t) Γ)]
 
-  [(⊢ Γ e t Γ_e)
-   --------------------------------------------- "variable declaration"
-   (⊢ Γ (letvar x : t = e) unit (extend x t Γ))]
+  [(⊢ Γ e_bind t_bind Γ_bind)
+   (⊢ (extend-var x t Γ) e_body t_body Γ_body)
+   ----------------------------------------------- "variable declaration"
+   (⊢ Γ (letvar x : t = e_bind e_body) t_body Γ)]
 
-  [(⊢ Γ e t Γ_e)
-   ---------------------- "variable definition"
-   (⊢ Γ (x : t = e) unit Γ)]
+  ;; [(⊢ Γ e t Γ_e)
+  ;;  ---------------------- "variable definition"
+  ;;  (⊢ Γ (x : t = e) unit Γ)]
   
-  [(⊢ Γ e t Γ_e)
-   ------------------------- "region binding"
-   (⊢ Γ (letrgn [p] e) t Γ)]
-
-  [(⊢ Γ e t Γ_e)
-   -------------- "sequencing end"
-   (⊢ Γ {e} t Γ)]
-  
-  [(⊢ Γ e_1 t_1 Γ_1)
-   (⊢ Γ_1 {e_2 e_rest ...} t_rest Γ_rest)
-   -------------------------------------- "sequencing"
-   (⊢ Γ {e_1 e_2 e_rest ...} t_rest Γ)  ]
+  [(⊢ (extend-rgn r {} Γ) e t Γ_e)
+   ---------------------------------------- "region binding"
+   (⊢ Γ (letrgn [r] e) t (drop-rgn r Γ_e))]
   
   )
 
@@ -139,44 +134,69 @@
   )
 
 (define-metafunction Simple+Γ
-  extend : x t Γ -> Γ
-  [(extend x t ((x_Γ t_Γ) ...)) ((x t) (x_Γ t_Γ) ...)]
+  extend-var : x t Γ -> Γ
+  [(extend-var x t (((x_Γ : t_Γ) ...) Γr))
+   (((x : t) (x_Γ : t_Γ) ...) Γr)]
   )
 
 (define-metafunction Simple+Γ
-  lookup : x Γ -> t
-  [(lookup x ((x t)     (x_2 t_2) ...)) t]
-  [(lookup x ((x_1 t_1) (x_2 t_2) ...)) (lookup x ((x_2 t_2) ...))]
+  lookup-var : x Γ -> t
+  [(lookup-var x
+               (((x : t) (x_2 : t_2) ...) Γr))
+   t]
+  [(lookup-var x
+               (((x_1 : t_1) (x_2 : t_2) ...)
+                Γr))
+   (lookup-var x
+               (((x_2 : t_2) ...)
+                Γr))]
   )
 
+(define-metafunction Simple+Γ
+  extend-rgn : r loans Γ -> Γ
+  [(extend-rgn r loans (Γv ((r_Γ ↦ loans_Γ) ...)))
+   (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...))]
+  )
+
+(define-metafunction Simple+Γ
+  lookup-rgn : x Γ -> t
+  [(lookup-rgn r
+               (Γv
+                ((r ↦ loans) (r_2 ↦ loans_2) ...)))
+   loans]
+  [(lookup-rgn r (Γv ((r_1 ↦ loans_1) (r_2 ↦ loans_2) ...)))
+   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))]
+  )
+
+  (define-metafunction Simple+Γ
+    drop-rgn : r Γ -> Γ
+    [(drop-rgn r (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)))
+     (Γv ((r_Γ ↦ loans_Γ) ...))]
+    [(drop-rgn r (Γv ((r_other ↦ loans_other) (r_Γ ↦ loans_Γ) ...)))
+     (drop-rgn r (Γv ((r_Γ ↦ loans_Γ) ...)))]
+   )
+
 ;; Tests for the typechecker.
-(test-judgment-holds (⊢ () 1 int any))
-(test-judgment-holds (⊢ () true bool any))
-(test-judgment-holds (⊢ () false bool any))
-(test-judgment-holds (⊢ () (letvar x : int = 1) unit any))
-(test-judgment-holds (⊢ () (letvar x : bool = false) unit any))
-(test-judgment-holds (⊢ ()
-                        {(letvar x : bool = false)
-                         (letvar y : bool = true)
-                         x}
+(define-term Γ_empty (() ()))
+(test-judgment-holds (⊢ Γ_empty 1 int any))
+(test-judgment-holds (⊢ Γ_empty true bool any))
+(test-judgment-holds (⊢ Γ_empty false bool any))
+(test-judgment-holds (⊢ Γ_empty (letvar x : int = 1 x) int any))
+(test-judgment-holds (⊢ Γ_empty (letvar x : bool = false x) bool any))
+(test-judgment-holds (⊢ Γ_empty
+                        (letvar x : bool = false (letvar y : bool = true x))
                         bool
                         any))
-(test-judgment-holds (⊢ ()
-                        {(letvar x : int = 0)
-                         (x : int = 1)
-                         x}
-                        int any))
 
 (test-equal
- (judgment-holds (⊢ () (letvar x : int = false) int any))
+ (judgment-holds (⊢ Γ_empty (letvar x : int = false x) bool any))
  #false)
 
-(test-equal
- (judgment-holds (⊢ () (letvar x : int = false) bool any))
- #false)
-
-(test-equal
- (judgment-holds (⊢ () {(letvar x : int = false) x} int any))
- #false)
+;; References
+(test-judgment-holds (⊢ Γ_empty
+                        (letvar x : int = 0
+                                (letrgn [r1] (& r1 unique x)))
+                        (& r unique int)
+                        any))
 
 (test-results)
