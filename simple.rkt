@@ -18,7 +18,6 @@
 
      ;; Variable binding.
      (letvar x : t = e e) ;; bind x of type τ to the result of e, place at ρ
-     ;; (x : t = e)
 
      ;; Region binding.
      (letrgn [r] e)
@@ -118,13 +117,19 @@
    ----------------------------------------------- "variable declaration"
    (⊢ Γ (letvar x : t = e_bind e_body) t_body Γ)]
 
-  ;; [(⊢ Γ e t Γ_e)
-  ;;  ---------------------- "variable definition"
-  ;;  (⊢ Γ (x : t = e) unit Γ)]
-  
   [(⊢ (extend-rgn r {} Γ) e t Γ_e)
    ---------------------------------------- "region binding"
    (⊢ Γ (letrgn [r] e) t (drop-rgn r Γ_e))]
+
+
+  ;; ⋓ requires that types of bound variables in the two stack
+  ;; typings be equal (which potentially demands use of T-Drop when typing the branches), and unions
+  ;; the loan sets for each region 𝑟 from both stack typings
+  [(⊢ (Γv Γr) e_cond bool Γ_cond)
+   (⊢ (Γv Γr) e_then t (Γv_then Γr_then))
+   (⊢ (Γv Γr) e_else t (Γv_else Γr_else))
+   ------------------------------------------------------- "branch"
+   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))]
   
   )
 
@@ -153,9 +158,15 @@
   )
 
 (define-metafunction Simple+Γ
+  insert-rgn : r loans Γr -> Γr
+  [(insert-rgn r loans ((r_Γ ↦ loans_Γ) ...))
+     ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)]
+  )
+
+(define-metafunction Simple+Γ
   extend-rgn : r loans Γ -> Γ
-  [(extend-rgn r loans (Γv ((r_Γ ↦ loans_Γ) ...)))
-   (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...))]
+  [(extend-rgn r loans (Γv Γr))
+   (Γv (insert-rgn r loans Γr))]
   )
 
 (define-metafunction Simple+Γ
@@ -168,13 +179,56 @@
    (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))]
   )
 
-  (define-metafunction Simple+Γ
-    drop-rgn : r Γ -> Γ
-    [(drop-rgn r (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)))
-     (Γv ((r_Γ ↦ loans_Γ) ...))]
-    [(drop-rgn r (Γv ((r_other ↦ loans_other) (r_Γ ↦ loans_Γ) ...)))
-     (drop-rgn r (Γv ((r_Γ ↦ loans_Γ) ...)))]
-   )
+(define-metafunction Simple+Γ
+  drop-rgn : r Γ -> Γ
+  [(drop-rgn r (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)))
+   (Γv ((r_Γ ↦ loans_Γ) ...))]
+  [(drop-rgn r (Γv ((r_other ↦ loans_other) (r_Γ ↦ loans_Γ) ...)))
+   (drop-rgn r (Γv ((r_Γ ↦ loans_Γ) ...)))]
+  )
+
+
+(define-metafunction Simple+Γ
+  ⋃ : loans loans -> loans ;; \union : set union of two loan sets.
+  [(⋃ loans ()) loans]
+  [(⋃ ((ω_1 p_1) ...) ((ω p) (ω_rest p_rest) ...))
+   (⋃ ((ω_1 p_1) ... (ω p)) ((ω_rest p_rest) ...))
+   (side-condition (not (member (term (ω p)) (term ((ω_1 p_1) ...)))))]
+  [(⋃ loans ((ω p) (ω_rest p_rest) ...))
+   (⋃ loans ((ω_rest p_rest) ...))]
+  )
+
+;; Test for ⋃
+(test-equal
+ (term (⋃ ((unique x)) ((unique x))))
+ (term ((unique x)))
+ )
+(test-equal
+ (term (⋃ ((unique x)) ((unique x) (shared y))))
+ (term ((unique x) (shared y)))
+ )
+
+
+(define-metafunction Simple+Γ
+  ⋓ : Γr Γr -> Γr ;; \Cup : union the loan sets of then and else.
+  [(⋓ Γr_1 ()) Γr_1]
+  [(⋓ () Γr_2) Γr_2]
+  [(⋓ ((r ↦ loans_1)
+       (r_rest1 ↦ loans_rest1) ...) ;; we will iterate over the first environment.
+      ((r_before2 ↦ loans_before2)
+       ...
+       (r ↦ loans_2)
+       (r_rest2 ↦ loans_rest2) ...))
+   (insert-rgn r (⋃ loans_1 loans_2)
+               (⋓ ((r_rest1 ↦ loans_rest1) ...)
+                  ((r_before2 ↦ loans_before2) ... (r_rest2 ↦ loans_rest2) ...)))]
+  )
+
+;; Tests for ⋓
+(test-equal
+ (term (⋓ [(r1 ↦ {(unique x)})] [(r1 ↦ {(unique y)})]))
+ (term [(r1 ↦ {(unique x) (unique y)})])
+ )
 
 ;; Tests for the typechecker.
 (define-term Γ_empty (() ()))
