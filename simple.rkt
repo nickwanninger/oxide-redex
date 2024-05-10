@@ -106,6 +106,7 @@
 
   [ ;; TODO: the hard part :3
    ;; Γ(r) = ∅
+   (side-condition (empty? (lookup-rgn r Γ)))
    ;; Γ ⊢ω p => { ℓ }
    ;; Γ ⊢ω p : t
    (⊢ Γ x t Γ_x)
@@ -128,7 +129,7 @@
   [(⊢ (Γv Γr) e_cond bool Γ_cond)
    (⊢ (Γv Γr) e_then t (Γv_then Γr_then))
    (⊢ (Γv Γr) e_else t (Γv_else Γr_else))
-   ------------------------------------------------------- "branch"
+   ----------------------------------------------------------------- "branch"
    (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))]
   
   )
@@ -170,7 +171,7 @@
   )
 
 (define-metafunction Simple+Γ
-  lookup-rgn : x Γ -> t
+  lookup-rgn : r Γ -> loans
   [(lookup-rgn r
                (Γv
                 ((r ↦ loans) (r_2 ↦ loans_2) ...)))
@@ -240,6 +241,19 @@
 (test-judgment-holds (⊢ Γ_empty
                         (letvar x : bool = false (letvar y : bool = true x))
                         bool
+                        any))
+(test-judgment-holds (⊢ Γ_empty
+                        (letvar x : bool = true (if x 100 200))
+                        int
+                        any))
+
+(test-judgment-holds (⊢ Γ_empty
+                        (letrgn [rz]
+                                (letvar x : bool = true
+                                        (letvar y : bool = false
+                                                (letvar z : (& rz unique bool) = (if x (& rz unique x) (& rz unique y))
+                                                        z))))
+                        (& r unique bool)
                         any))
 
 (test-equal
