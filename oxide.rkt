@@ -72,8 +72,8 @@
      (Left  [τ τ] e)          ; Left::<τ1, τ2>(e)
      (Right [τ τ] e)          ; Right::<τ1, τ2>(e)
      (match e
-            (Left x e)
-            (Right x e)))      ; match e { Left(x) ⇒ e, Right(x) ⇒ e }
+       (Left x e)
+       (Right x e)))      ; match e { Left(x) ⇒ e, Right(x) ⇒ e }
 
 
   ;; Polymorphicc variables
@@ -145,8 +145,7 @@
  (letrgn [x y]
          (do (define pt (Point 6 9))
              (define x (& x uniq (dot pt 0)))
-             (define y (& x uniq (* x))))))
+           (define y (& x uniq (* x))))))
 
-              
-         
+
 
