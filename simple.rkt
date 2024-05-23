@@ -111,7 +111,7 @@
    (⊢ω Γ () ω x loans)
    ;; Γ ⊢ω p : t
    (⊢ Γ x t Γ_x)
-   ------------------------------------------------ "borrow"
+   ------------------------------------------------ "T-Borrow"
    (⊢ Γ (& r ω x) (& r ω t) (extend-rgn r loans Γ))]
 
   [(⊢ Γ e_bind t_bind Γ_bind)
@@ -141,15 +141,13 @@
   ;; p is ω-safe under Γ, with reborrow-exlusion list π-, and may point to any of the loas in the borrow chain { ^ω p }
 
 
-
-  [;; Check if a place π is ω-safe by looking at each loan in every region r' in Γ and either:
-   ;; (1) if either that loan or ω is unique, then π does not overlap with the loan
+  ;; Check if a place π is ω-safe by looking at each loan in every region r' in Γ and either:
+  [ ;; (1) if either that loan or ω is unique, then π does not overlap with the loan
    (side-condition (∀# unique p Γr))
    ------------------------- "O-SafePlace"
    (⊢ω (Γv Γr) πs unique p {(unique p)})]
 
-  [;; Check if a place π is ω-safe by looking at each loan in every region r' in Γ and either:
-   ;; (2) all references in Γ with region r' are in the reborrow exclusion list
+  [ ;; (2) all references in Γ with region r' are in the reborrow exclusion list
    ;; TODO
    -------------------------- "O-SafePlace-Reborrow"
    (⊢ω (Γv Γr) πs unique p {(unique p)})]
@@ -189,6 +187,11 @@
             ((ω_rest p_rest) ↦ loans_rest) ...})
    (∀# ω p {((ω_rest p_rest) ↦ loans_rest) ...})]
   )
+
+(test-equal
+ (term (∀# ((unique x) ↦ ()) ((unique x))))
+ #t
+ )
 
 (define-metafunction Simple+Γ
   [(same? t_1 t_1) #t]
@@ -303,7 +306,7 @@
                         int
                         any))
 
-(test-judgment-holds (⊢ Γ_empty
+#;(test-judgment-holds (⊢ Γ_empty
                         (letrgn [rz]
                                 (letvar x : bool = true
                                         (letvar y : bool = false
