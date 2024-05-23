@@ -117,11 +117,13 @@
 
   [;; TODO: more complicated than this.
    (⊢ Γ x (& r ω t) Γ_x)
-   --------------------------------------- "T-SetDeref"
+   (⊢ω Γ () shared x loans)
+   --------------------------------------- "T-SetDeref" ;; T-Copy in the paper.
    (⊢ Γ (get x) t Γ)]
 
   [;; TODO: more complicated than this.
-   (⊢ Γ x (& r shared t_loc) Γ)
+   (⊢ Γ x (& r unique t_loc) Γ_p)
+   (⊢ω Γ () unique x loans)
    (⊢ Γ e_val t_loc Γ_val)
    (⊢ Γ_val e_body t_body Γ_body)
    --------------------------------------- "T-GetDeref"
@@ -454,10 +456,35 @@
     (letvar x : int = 0
             (letrgn
              [r1]
-             (letvar y : (& r1 shared int) = (& r1 shared x)
+             (letvar y : (& r1 unique int) = (& r1 unique x)
                      (set y 100 (get y)))))
     int
     Γ))
+
+(test-judgment-holds
+ (⊢ Γ_empty
+    (letvar x : int = 0
+            (letvar y : int =
+                    (letrgn [r1] (letvar ref1 : (& r1 unique int) =
+                                         (& r1 unique x)
+                                         (set ref1 100 (get ref1))))
+                    (letrgn [r2] (letvar ref2 : (& r2 unique int) =
+                                         (& r2 unique x)
+                                         (set ref2 200 (get ref2))))))
+    int
+    Γ))
+
+(test-equal
+ (judgment-holds
+  (⊢ Γ_empty
+     (letvar x : int = 0
+             (letrgn
+              [r1]
+              (letvar y : (& r1 shared int) = (& r1 shared x)
+                      (set y 100 (get y)))))
+     int
+     Γ))
+ #f)
 
 ;; (test-match Oxide+Γ (letvar x : t = e_bind e_body)
 ;; (term (letvar y : (& r1 unique int) = (& r1 unique x) 100)))
