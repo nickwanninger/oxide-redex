@@ -22,6 +22,10 @@
      ;; Region binding.
      (letrgn [r] e)
 
+     ;; Reference access.
+     (set x e e)
+     (get x)
+
      ;; Structured control flow
      (if e e e)   ;; predication, "the only interesting thing"
      ;;                             -Christos Dimoulas, Ph.D.
@@ -110,6 +114,18 @@
 
   [----------------------- "variable"
    (⊢ Γ x (lookup-var x Γ) Γ)]
+
+  [;; TODO: more complicated than this.
+   (⊢ Γ x (& r ω t) Γ_x)
+   --------------------------------------- "T-SetDeref"
+   (⊢ Γ (get x) t Γ)]
+
+  [;; TODO: more complicated than this.
+   (⊢ Γ x (& r shared t_loc) Γ)
+   (⊢ Γ e_val t_loc Γ_val)
+   (⊢ Γ_val e_body t_body Γ_body)
+   --------------------------------------- "T-GetDeref"
+   (⊢ Γ (set x e_val e_body) t_body Γ_body)]
 
   [;; Γ(r) = ∅
    (side-condition ,(empty? (term (lookup-rgn r Γ))))
@@ -420,12 +436,6 @@
 
 (test-judgment-holds
  (⊢ Γ_empty
-    (if false 100 200)
-    int
-    Γ))
-
-(test-judgment-holds
- (⊢ Γ_empty
     (letvar x : int = 0
             (letrgn
              [r1]
@@ -438,19 +448,16 @@
     int
     Γ))
 
-(test-match
- Oxide+Γ
- (letvar x : t = e_1 e_2)
- (term  (letvar y : (& r1 unique int) = (& r1 unique x) 100)))
-      ;; )))
 
-(test-match Oxide+Γ
-            (if e_1 e_2 e_3)
-            (term (if x
-                      (letvar y : (& r1 unique int) = (& r1 unique x) 100)
-                      200
-                      ))
-            )
+(test-judgment-holds
+ (⊢ Γ_empty
+    (letvar x : int = 0
+            (letrgn
+             [r1]
+             (letvar y : (& r1 shared int) = (& r1 shared x)
+                     (set y 100 (get y)))))
+    int
+    Γ))
 
 ;; (test-match Oxide+Γ (letvar x : t = e_bind e_body)
 ;; (term (letvar y : (& r1 unique int) = (& r1 unique x) 100)))
