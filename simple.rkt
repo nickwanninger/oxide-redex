@@ -81,7 +81,7 @@
   (Γv ::= ((x : t) ...))
   (Γr ::= ((r ↦ loans) ...))
   (loans ::= {(ω p) ...})
-      
+  (πs ::= ((p ...) ...))
                
   )
 
@@ -108,14 +108,15 @@
    ;; Γ(r) = ∅
    (side-condition (empty? (lookup-rgn r Γ)))
    ;; Γ ⊢ω p => { ℓ }
+   (⊢ω Γ () ω x loans)
    ;; Γ ⊢ω p : t
    (⊢ Γ x t Γ_x)
-   ----------------- "borrow"
-   (⊢ Γ (& r ω x) (& r ω t) Γ)]
+   ------------------------------------------------ "borrow"
+   (⊢ Γ (& r ω x) (& r ω t) (extend-rgn r loans Γ))]
 
   [(⊢ Γ e_bind t_bind Γ_bind)
    (⊢ (extend-var x t Γ) e_body t_body Γ_body)
-   ----------------------------------------------- "variable declaration"
+   ---------------------------------------------- "variable declaration"
    (⊢ Γ (letvar x : t = e_bind e_body) t_body Γ)]
 
   [(⊢ (extend-rgn r {} Γ) e t Γ_e)
@@ -132,6 +133,61 @@
    ----------------------------------------------------------------- "branch"
    (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))]
   
+  )
+
+(define-judgment-form Simple+Γ
+  #:mode (⊢ω I I I I O)
+  #:contract (⊢ω Γ πs ω p loans)
+  ;; p is ω-safe under Γ, with reborrow-exlusion list π-, and may point to any of the loas in the borrow chain { ^ω p }
+
+
+
+  [;; Check if a place π is ω-safe by looking at each loan in every region r' in Γ and either:
+   ;; (1) if either that loan or ω is unique, then π does not overlap with the loan
+   (side-condition (∀# unique p Γr))
+   ------------------------- "O-SafePlace"
+   (⊢ω (Γv Γr) πs unique p {(unique p)})]
+
+  [;; Check if a place π is ω-safe by looking at each loan in every region r' in Γ and either:
+   ;; (2) all references in Γ with region r' are in the reborrow exclusion list
+   ;; TODO
+   -------------------------- "O-SafePlace-Reborrow"
+   (⊢ω (Γv Γr) πs unique p {(unique p)})]
+  
+  )
+
+(define-metafunction Simple+Γ
+  ∀# : ω p Γr -> boolean
+  ;; unique place aliases with something. womp womp.
+  [(∀# unique p {(r ↦ ((ω p) (ω_rest p_rest) ...))
+                 (r_rest ↦ loans_rest) ...}) #f]
+
+  ;; Iterate over the loan set.
+  [(∀# unique p {(r ↦ ((ω_other p_other)
+                       (ω_rest p_rest) ...))
+                 (r_rest ↦ loans_rest) ...})
+   (∀# unique p {(r ↦ ((ω_rest p_rest) ...))
+                 (r_rest ↦ loans_rest) ...})]
+
+  ;; End of loan set.
+  [(∀# unique p {(r ↦ ())
+                 (r_rest ↦ loans_rest) ...})
+   (∀# unique p {(r_rest ↦ loans_rest) ...})]
+
+  ;; End of Γr
+  [(∀# unique p {}) #f]
+
+  
+  ;; shared place aliases with a unique loan. womp womp.
+  [(∀# shared p {((unique p) ↦ loans) ((ω_rest p_rest) ↦ loans_rest) ...}) #f]
+
+  ;; we didn't alias, yippee!
+  [(∀# ω p {((ω_other p_other) ↦ loans_other)}) #t]
+  
+  ;; this one doesn't alias, keep on choogaloogin'.
+  [(∀# ω p {((ω_other p_other) ↦ loans_other)
+            ((ω_rest p_rest) ↦ loans_rest) ...})
+   (∀# ω p {((ω_rest p_rest) ↦ loans_rest) ...})]
   )
 
 (define-metafunction Simple+Γ
@@ -267,4 +323,36 @@
                         (& r unique int)
                         any))
 
-(test-results)
+;; First, we need to make this test fail by seeing that r1 and r2 alias.
+;; Then, we need to make this test pass by seeing that r1 is dropped once r2 borrows x.
+(test-judgment-holds
+ (⊢ Γ_empty
+    (letvar x : int = 0
+            (letrgn
+             [r1]
+             (letrgn
+              [r2]
+              (letvar
+               y : (& r1 unique int) = (& r1 unique x)
+               (letvar z : (& r2 unique int) = (& r2 unique x) z)))))
+    (& r unique int)
+    any))
+
+;; This test should fail, because we are borrowing from x in r1 and r2.
+(test-equal
+ (judgment-holds
+  (⊢ Γ_empty
+     (letvar x : int = 0
+             (letrgn
+              [r1]
+              (letrgn
+               [r2]
+               (letvar
+                y : (& r1 unique int) = (& r1 unique x)
+                (letvar z : (& r2 unique int) = (& r2 unique x) y)))))
+     (& r unique int)
+     any))
+ #false)
+
+
+ (test-results)
