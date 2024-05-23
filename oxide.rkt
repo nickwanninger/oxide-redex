@@ -21,23 +21,23 @@
 
      ;; Region binding.
      (letrgn [r] e)
-     
+
      ;; Structured control flow
-     (if e e e)   ;; predication, "the only interesting thing"
+     (if e e e))   ;; predication, "the only interesting thing"
      ;;                             -Christos Dimoulas, Ph.D.
      ;;                               5/9/2024
-     )
+
 
   ;; Constants
   (c ::= i true false ())
   (i ::= integer)
-  
+
   ;; Place expressions.
   (p ::=
      x     ;; variable
-     (* p) ;; dereference
+     (* p)) ;; dereference
      ;; (. p i) ;; tuple indexing
-     )
+
 
   ;; Variables.
   (x ::= variable-not-otherwise-mentioned)
@@ -45,8 +45,8 @@
   ;; Region
   (ρ ::=
      r ;; concrete region
-     ϱ ;; abstract region
-     )
+     ϱ) ;; abstract region
+
   ;; Concrete region variables.
   (r ::= variable-not-otherwise-mentioned)
   ;; Abstract region variables.
@@ -61,17 +61,17 @@
      unit      ;; unit type
      int       ;; integer type
      bool      ;; boolean type
-     (& ρ ω t) ;; reference type
+     (& ρ ω t)) ;; reference type
 
      ;; α              ;; type variable
      ;; ((t ...) -> t) ;; function type
-     )
+
 
 
   #:binding-forms
   (letvar x : t = e e #:refers-to x)
-  (letrgn [r] e #:refers-to r)
-  )
+  (letrgn [r] e #:refers-to r))
+
 
 (default-language Simple)
 
@@ -86,8 +86,8 @@
   ;; List of loans.
   (loans ::= {(ω p) ...})
   ;; List of places.
-  (πs ::= ((p ...) ...))
-  )
+  (πs ::= ((p ...) ...)))
+
 
 (define-judgment-form Simple+Γ
   #:mode (⊢ I I O O)
@@ -95,7 +95,7 @@
 
   [-------------- "unit"
    (⊢ Γ () unit Γ)]
-  
+
   [-------------- "integer"
    (⊢ Γ integer int Γ)]
 
@@ -136,9 +136,9 @@
    (⊢ (Γv Γr) e_then t (Γv_then Γr_then))
    (⊢ (Γv Γr) e_else t (Γv_else Γr_else))
    ----------------------------------------------------------------- "branch"
-   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))]
-  
-  )
+   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))])
+
+
 
 (define-judgment-form Simple+Γ
   #:mode (⊢ω I I I I O)
@@ -150,14 +150,14 @@
   [ ;; (1) if either that loan or ω is unique, then π does not overlap with the loan
    (side-condition (∀# ω p Γr))
    -------------------------------------- "O-SafePlace-Loan-Aliasing"
-   (⊢ω (Γv Γr) πs ω p {(ω p)})]
+   (⊢ω (Γv Γr) πs ω p {(ω p)})])
 
   ;; [ ;; (2) all references in Γ with region r' are in the reborrow exclusion list
   ;;  ;; TODO
   ;;  -------------------------------------- "O-SafePlace-Exclusion"
   ;;  (⊢ω (Γv Γr) πs ω p {(ω p)})]
-  
-  )
+
+
 
 
 
@@ -186,29 +186,29 @@
    (∀# ω p {(r_rest ↦ loans_rest) ...})]
 
   ;; End of Γr
-  [(∀# ω p {}) #t]
-  )
+  [(∀# ω p {}) #t])
+
 
 ;; Tests for ∀#
 (test-equal
  (term (∀# unique x {(r ↦ [(unique x)])}))
- #f
- )
+ #f)
+
 
 (test-equal
  (term (∀# shared x {(r ↦ [(shared x)])}))
- #t
- )
+ #t)
+
 
 (test-equal
  (term (∀# shared x {(r ↦ [(unique definitely-not-x)])}))
- #t
- )
+ #t)
+
 
 (test-equal
  (term (∀# shared x {(r ↦ [(unique x)])}))
- #f
- )
+ #f)
+
 
 ;; END ∀#
 
@@ -217,14 +217,14 @@
 
 (define-metafunction Simple+Γ
   [(same? t_1 t_1) #t]
-  [(same? t_1 t_2) #f]
-  )
+  [(same? t_1 t_2) #f])
+
 
 (define-metafunction Simple+Γ
   extend-var : x t Γ -> Γ
   [(extend-var x t (((x_Γ : t_Γ) ...) Γr))
-   (((x : t) (x_Γ : t_Γ) ...) Γr)]
-  )
+   (((x : t) (x_Γ : t_Γ) ...) Γr)])
+
 
 (define-metafunction Simple+Γ
   lookup-var : x Γ -> t
@@ -236,20 +236,20 @@
                 Γr))
    (lookup-var x
                (((x_2 : t_2) ...)
-                Γr))]
-  )
+                Γr))])
+
 
 (define-metafunction Simple+Γ
   insert-rgn : r loans Γr -> Γr
   [(insert-rgn r loans ((r_Γ ↦ loans_Γ) ...))
-     ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)]
-  )
+   ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)])
+
 
 (define-metafunction Simple+Γ
   extend-rgn : r loans Γ -> Γ
   [(extend-rgn r loans (Γv Γr))
-   (Γv (insert-rgn r loans Γr))]
-  )
+   (Γv (insert-rgn r loans Γr))])
+
 
 (define-metafunction Simple+Γ
   lookup-rgn : r Γ -> loans
@@ -258,16 +258,16 @@
                 ((r ↦ loans) (r_2 ↦ loans_2) ...)))
    loans]
   [(lookup-rgn r (Γv ((r_1 ↦ loans_1) (r_2 ↦ loans_2) ...)))
-   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))]
-  )
+   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))])
+
 
 (define-metafunction Simple+Γ
   drop-rgn : r Γ -> Γ
   [(drop-rgn r (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)))
    (Γv ((r_Γ ↦ loans_Γ) ...))]
   [(drop-rgn r (Γv ((r_other ↦ loans_other) (r_Γ ↦ loans_Γ) ...)))
-   (drop-rgn r (Γv ((r_Γ ↦ loans_Γ) ...)))]
-  )
+   (drop-rgn r (Γv ((r_Γ ↦ loans_Γ) ...)))])
+
 
 
 (define-metafunction Simple+Γ
@@ -277,18 +277,18 @@
    (⋃ ((ω_1 p_1) ... (ω p)) ((ω_rest p_rest) ...))
    (side-condition (not (member (term (ω p)) (term ((ω_1 p_1) ...)))))]
   [(⋃ loans ((ω p) (ω_rest p_rest) ...))
-   (⋃ loans ((ω_rest p_rest) ...))]
-  )
+   (⋃ loans ((ω_rest p_rest) ...))])
+
 
 ;; Test for ⋃
 (test-equal
  (term (⋃ ((unique x)) ((unique x))))
- (term ((unique x)))
- )
+ (term ((unique x))))
+
 (test-equal
  (term (⋃ ((unique x)) ((unique x) (shared y))))
- (term ((unique x) (shared y)))
- )
+ (term ((unique x) (shared y))))
+
 
 
 
@@ -306,14 +306,14 @@
        (r_rest2 ↦ loans_rest2) ...))
    (insert-rgn r (⋃ loans_1 loans_2)
                (⋓ ((r_rest1 ↦ loans_rest1) ...)
-                  ((r_before2 ↦ loans_before2) ... (r_rest2 ↦ loans_rest2) ...)))]
-  )
+                  ((r_before2 ↦ loans_before2) ... (r_rest2 ↦ loans_rest2) ...)))])
+
 
 ;; Tests for ⋓
 (test-equal
  (term (⋓ [(r1 ↦ {(unique x)})] [(r1 ↦ {(unique y)})]))
- (term [(r1 ↦ {(unique x) (unique y)})])
- )
+ (term [(r1 ↦ {(unique x) (unique y)})]))
+
 
 ;; END ⋓
 
@@ -335,14 +335,14 @@
                         int
                         any))
 
-#;(test-judgment-holds (⊢ Γ_empty
-                        (letrgn [rz]
-                                (letvar x : bool = true
-                                        (letvar y : bool = false
-                                                (letvar z : (& rz unique bool) = (if x (& rz unique x) (& rz unique y))
-                                                        z))))
-                        (& r unique bool)
-                        any))
+;; #;(test-judgment-holds (⊢ Γ_empty
+;;                         (letrgn [rz]
+;;                                 (letvar x : bool = true
+;;                                         (letvar y : bool = false
+;;                                                 (letvar z : (& rz unique bool) = (if x (& rz unique x) (& rz unique y))
+;;                                                         z))))
+;;                         (& r unique bool)
+;;                         any))
 
 (test-equal
  (judgment-holds (⊢ Γ_empty (letvar x : int = false x) bool any))
@@ -387,4 +387,4 @@
  #false)
 
 
- (test-results)
+(test-results)
