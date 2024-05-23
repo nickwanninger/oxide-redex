@@ -243,8 +243,10 @@
 
 (define-metafunction Simple+Γ
   insert-rgn : r loans Γr -> Γr
-  [(insert-rgn r loans ((r_Γ ↦ loans_Γ) ...))
-   ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)])
+  [(insert-rgn r loans ((r_first ↦ loans_first) ... (r ↦ loans_other) (r_rest ↦ loans_rest) ...))
+   ((r_first ↦ loans_first) ... (r ↦ loans) (r_rest ↦ loans_rest) ...)]
+  [(insert-rgn r loans ((r_rest ↦ loans_rest) ...))
+   ((r ↦ loans) (r_rest ↦ loans_rest) ...)])
 
 
 (define-metafunction Simple+Γ
@@ -387,6 +389,25 @@
      (& r unique int)
      any))
  #false)
+
+(test-judgment-holds
+ (⊢ ({(x : int)} {(r ↦ ())})
+    (& r unique x)
+    (& r unique int)
+    ({(x : int)} {(r ↦ ((unique x)))})))
+
+(test-judgment-holds
+ (⊢ Γ_empty
+    (letvar x : int = 0
+            (letrgn [r1]
+                    (letrgn [r2]
+                            (if x
+                                (letvar y : (& r1 unique int) = (& r1 unique x) 100)
+                                200
+                                ;; (letvar z : (& r2 unique int) = (& r2 unique x) 200)
+                                ))))
+    int
+    any))
 
 
 (test-results)
