@@ -77,12 +77,16 @@
 
 ;; Extended language for the typechecker.
 (define-extended-language Simple+Γ Simple
+  ;; Combined environment.
   (Γ  ::= (Γv Γr))
+  ;; Variable envirnment.
   (Γv ::= ((x : t) ...))
+  ;; Region/provenance environment.
   (Γr ::= ((r ↦ loans) ...))
+  ;; List of loans.
   (loans ::= {(ω p) ...})
+  ;; List of places.
   (πs ::= ((p ...) ...))
-               
   )
 
 (define-judgment-form Simple+Γ
@@ -110,14 +114,15 @@
    ;; Γ ⊢ω p => { ℓ }
    (⊢ω Γ () ω x loans)
    ;; Γ ⊢ω p : t
+
    (⊢ Γ x t Γ_x)
    ------------------------------------------------ "T-Borrow"
    (⊢ Γ (& r ω x) (& r ω t) (extend-rgn r loans Γ))]
 
-  [(⊢ Γ e_bind t_bind Γ_bind)
-   (⊢ (extend-var x t Γ) e_body t_body Γ_body)
-   ---------------------------------------------- "variable declaration"
-   (⊢ Γ (letvar x : t = e_bind e_body) t_body Γ)]
+  [(⊢ (Γv Γr) e_bind t (Γv_bind Γr_bind))
+   (⊢ (extend-var x t (Γv Γr_bind)) e_body t_body (Γv_body Γr_body))
+   ----------------------------------------------------------------- "variable declaration"
+   (⊢ (Γv Γr) (letvar x : t = e_bind e_body) t_body (Γv Γr_body))]
 
   [(⊢ (extend-rgn r {} Γ) e t Γ_e)
    ---------------------------------------- "region binding"
@@ -143,55 +148,72 @@
 
   ;; Check if a place π is ω-safe by looking at each loan in every region r' in Γ and either:
   [ ;; (1) if either that loan or ω is unique, then π does not overlap with the loan
-   (side-condition (∀# unique p Γr))
-   ------------------------- "O-SafePlace"
-   (⊢ω (Γv Γr) πs unique p {(unique p)})]
+   (side-condition (∀# ω p Γr))
+   -------------------------------------- "O-SafePlace-Loan-Aliasing"
+   (⊢ω (Γv Γr) πs ω p {(ω p)})]
 
-  [ ;; (2) all references in Γ with region r' are in the reborrow exclusion list
-   ;; TODO
-   -------------------------- "O-SafePlace-Reborrow"
-   (⊢ω (Γv Γr) πs unique p {(unique p)})]
+  ;; [ ;; (2) all references in Γ with region r' are in the reborrow exclusion list
+  ;;  ;; TODO
+  ;;  -------------------------------------- "O-SafePlace-Exclusion"
+  ;;  (⊢ω (Γv Γr) πs ω p {(ω p)})]
   
   )
+
+
+
+;; BEGIN ∀#
 
 (define-metafunction Simple+Γ
   ∀# : ω p Γr -> boolean
   ;; unique place aliases with something. womp womp.
-  [(∀# unique p {(r ↦ ((ω p) (ω_rest p_rest) ...))
+  [(∀# unique p {(r ↦ [(ω p) (ω_rest p_rest) ...])
+                 (r_rest ↦ loans_rest) ...}) #f]
+
+  ;; shared place aliases with a unique loan. womp womp.
+  [(∀# shared p {(r ↦ [(unique p) (ω_rest p_rest) ...])
                  (r_rest ↦ loans_rest) ...}) #f]
 
   ;; Iterate over the loan set.
-  [(∀# unique p {(r ↦ ((ω_other p_other)
-                       (ω_rest p_rest) ...))
-                 (r_rest ↦ loans_rest) ...})
-   (∀# unique p {(r ↦ ((ω_rest p_rest) ...))
-                 (r_rest ↦ loans_rest) ...})]
+  [(∀# ω p {(r ↦ [(ω_other p_other)
+                  (ω_rest p_rest) ...])
+            (r_rest ↦ loans_rest) ...})
+   (∀# ω p {(r ↦ [(ω_rest p_rest) ...])
+            (r_rest ↦ loans_rest) ...})]
 
   ;; End of loan set.
-  [(∀# unique p {(r ↦ ())
-                 (r_rest ↦ loans_rest) ...})
-   (∀# unique p {(r_rest ↦ loans_rest) ...})]
+  [(∀# ω p {(r ↦ [])
+            (r_rest ↦ loans_rest) ...})
+   (∀# ω p {(r_rest ↦ loans_rest) ...})]
 
   ;; End of Γr
-  [(∀# unique p {}) #f]
-
-  
-  ;; shared place aliases with a unique loan. womp womp.
-  [(∀# shared p {((unique p) ↦ loans) ((ω_rest p_rest) ↦ loans_rest) ...}) #f]
-
-  ;; we didn't alias, yippee!
-  [(∀# ω p {((ω_other p_other) ↦ loans_other)}) #t]
-  
-  ;; this one doesn't alias, keep on choogaloogin'.
-  [(∀# ω p {((ω_other p_other) ↦ loans_other)
-            ((ω_rest p_rest) ↦ loans_rest) ...})
-   (∀# ω p {((ω_rest p_rest) ↦ loans_rest) ...})]
+  [(∀# ω p {}) #t]
   )
 
+;; Tests for ∀#
 (test-equal
- (term (∀# ((unique x) ↦ ()) ((unique x))))
+ (term (∀# unique x {(r ↦ [(unique x)])}))
+ #f
+ )
+
+(test-equal
+ (term (∀# shared x {(r ↦ [(shared x)])}))
  #t
  )
+
+(test-equal
+ (term (∀# shared x {(r ↦ [(unique definitely-not-x)])}))
+ #t
+ )
+
+(test-equal
+ (term (∀# shared x {(r ↦ [(unique x)])}))
+ #f
+ )
+
+;; END ∀#
+
+
+
 
 (define-metafunction Simple+Γ
   [(same? t_1 t_1) #t]
@@ -269,6 +291,9 @@
  )
 
 
+
+;; BEGIN ⋓
+
 (define-metafunction Simple+Γ
   ⋓ : Γr Γr -> Γr ;; \Cup : union the loan sets of then and else.
   [(⋓ Γr_1 ()) Γr_1]
@@ -290,7 +315,11 @@
  (term [(r1 ↦ {(unique x) (unique y)})])
  )
 
-;; Tests for the typechecker.
+;; END ⋓
+
+
+
+;; Tests for ⊢.
 (define-term Γ_empty (() ()))
 (test-judgment-holds (⊢ Γ_empty 1 int any))
 (test-judgment-holds (⊢ Γ_empty true bool any))
@@ -328,18 +357,18 @@
 
 ;; First, we need to make this test fail by seeing that r1 and r2 alias.
 ;; Then, we need to make this test pass by seeing that r1 is dropped once r2 borrows x.
-(test-judgment-holds
- (⊢ Γ_empty
-    (letvar x : int = 0
-            (letrgn
-             [r1]
-             (letrgn
-              [r2]
-              (letvar
-               y : (& r1 unique int) = (& r1 unique x)
-               (letvar z : (& r2 unique int) = (& r2 unique x) z)))))
-    (& r unique int)
-    any))
+;; (test-judgment-holds
+;;  (⊢ Γ_empty
+;;     (letvar x : int = 0
+;;             (letrgn
+;;              [r1]
+;;              (letrgn
+;;               [r2]
+;;               (letvar
+;;                y : (& r1 unique int) = (& r1 unique x)
+;;                (letvar z : (& r2 unique int) = (& r2 unique x) z)))))
+;;     (& r unique int)
+;;     any))
 
 ;; This test should fail, because we are borrowing from x in r1 and r2.
 (test-equal
