@@ -5,7 +5,7 @@
 
 
 
-(define-language Simple
+(define-language Oxide
   ;; Expressions
   (e ::=
 
@@ -23,9 +23,12 @@
      (letrgn [r] e)
 
      ;; Structured control flow
-     (if e e e))   ;; predication, "the only interesting thing"
+     (if e e e)   ;; predication, "the only interesting thing"
      ;;                             -Christos Dimoulas, Ph.D.
      ;;                               5/9/2024
+
+
+     )
 
 
   ;; Constants
@@ -34,7 +37,7 @@
 
   ;; Place expressions.
   (p ::=
-     x     ;; variable
+     x      ;; variable
      (* p)) ;; dereference
      ;; (. p i) ;; tuple indexing
 
@@ -73,10 +76,10 @@
   (letrgn [r] e #:refers-to r))
 
 
-(default-language Simple)
+(default-language Oxide)
 
 ;; Extended language for the typechecker.
-(define-extended-language Simple+Γ Simple
+(define-extended-language Oxide+Γ Oxide
   ;; Combined environment.
   (Γ  ::= (Γv Γr))
   ;; Variable envirnment.
@@ -89,7 +92,7 @@
   (πs ::= ((p ...) ...)))
 
 
-(define-judgment-form Simple+Γ
+(define-judgment-form Oxide+Γ
   #:mode (⊢ I I O O)
   #:contract (⊢ Γ e t Γ) ;; Take Γ and e, produce t (type of e) and new Γ
 
@@ -108,13 +111,11 @@
   [----------------------- "variable"
    (⊢ Γ x (lookup-var x Γ) Γ)]
 
-  [ ;; TODO: the hard part :3
-   ;; Γ(r) = ∅
-   (side-condition (empty? (lookup-rgn r Γ)))
+  [;; Γ(r) = ∅
+   (side-condition ,(empty? (term (lookup-rgn r Γ))))
    ;; Γ ⊢ω p => { ℓ }
    (⊢ω Γ () ω x loans)
    ;; Γ ⊢ω p : t
-
    (⊢ Γ x t Γ_x)
    ------------------------------------------------ "T-Borrow"
    (⊢ Γ (& r ω x) (& r ω t) (extend-rgn r loans Γ))]
@@ -136,11 +137,12 @@
    (⊢ (Γv Γr) e_then t (Γv_then Γr_then))
    (⊢ (Γv Γr) e_else t (Γv_else Γr_else))
    ----------------------------------------------------------------- "branch"
-   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))])
+   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))]
+  )
 
 
 
-(define-judgment-form Simple+Γ
+(define-judgment-form Oxide+Γ
   #:mode (⊢ω I I I I O)
   #:contract (⊢ω Γ πs ω p loans)
   ;; p is ω-safe under Γ, with reborrow-exlusion list π-, and may point to any of the loas in the borrow chain { ^ω p }
@@ -153,9 +155,9 @@
    (⊢ω (Γv Γr) πs ω p {(ω p)})])
 
   ;; [ ;; (2) all references in Γ with region r' are in the reborrow exclusion list
-  ;;  ;; TODO
-  ;;  -------------------------------------- "O-SafePlace-Exclusion"
-  ;;  (⊢ω (Γv Γr) πs ω p {(ω p)})]
+   ;; (side-condition (∃π (Γv Γr)
+   ;; -------------------------------------- "O-SafePlace-Exclusion"
+   ;; (⊢ω (Γv Γr) πs ω p {(ω p)})]
 
 
 
@@ -163,7 +165,7 @@
 
 ;; BEGIN ∀#
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   ∀# : ω p Γr -> boolean
   ;; unique place aliases with something. womp womp.
   [(∀# unique p {(r ↦ [(ω p) (ω_rest p_rest) ...])
@@ -190,45 +192,43 @@
 
 
 ;; Tests for ∀#
-
-
 (test-equal
  (term (∀# unique x {(r ↦ [(unique x)])}))
  #f)
-
-
 (test-equal
  (term (∀# shared x {(r ↦ [(shared x)])}))
  #t)
-
-
 (test-equal
  (term (∀# shared x {(r ↦ [(unique definitely-not-x)])}))
  #t)
-
-
 (test-equal
  (term (∀# shared x {(r ↦ [(unique x)])}))
  #f)
 
-
 ;; END ∀#
 
+;; START ∃π
+;; (define-metafunction Oxide+Γ
+  ;; ∃π : r Γv πs -> boolean
+  ;; [(∃π r ((x )
+  ;; )
+;; END ∃π
 
 
 
-(define-metafunction Simple+Γ
+
+(define-metafunction Oxide+Γ
   [(same? t_1 t_1) #t]
   [(same? t_1 t_2) #f])
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   extend-var : x t Γ -> Γ
   [(extend-var x t (((x_Γ : t_Γ) ...) Γr))
    (((x : t) (x_Γ : t_Γ) ...) Γr)])
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   lookup-var : x Γ -> t
   [(lookup-var x
                (((x : t) (x_2 : t_2) ...) Γr))
@@ -241,7 +241,7 @@
                 Γr))])
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   insert-rgn : r loans Γr -> Γr
   [(insert-rgn r loans ((r_first ↦ loans_first) ... (r ↦ loans_other) (r_rest ↦ loans_rest) ...))
    ((r_first ↦ loans_first) ... (r ↦ loans) (r_rest ↦ loans_rest) ...)]
@@ -249,23 +249,24 @@
    ((r ↦ loans) (r_rest ↦ loans_rest) ...)])
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   extend-rgn : r loans Γ -> Γ
   [(extend-rgn r loans (Γv Γr))
    (Γv (insert-rgn r loans Γr))])
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   lookup-rgn : r Γ -> loans
   [(lookup-rgn r
                (Γv
                 ((r ↦ loans) (r_2 ↦ loans_2) ...)))
    loans]
   [(lookup-rgn r (Γv ((r_1 ↦ loans_1) (r_2 ↦ loans_2) ...)))
-   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))])
+   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))]
+  )
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   drop-rgn : r Γ -> Γ
   [(drop-rgn r (Γv ((r ↦ loans) (r_Γ ↦ loans_Γ) ...)))
    (Γv ((r_Γ ↦ loans_Γ) ...))]
@@ -274,7 +275,7 @@
 
 
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   ⋃ : loans loans -> loans ;; \union : set union of two loan sets.
   [(⋃ loans ()) loans]
   [(⋃ ((ω_1 p_1) ...) ((ω p) (ω_rest p_rest) ...))
@@ -298,7 +299,7 @@
 
 ;; BEGIN ⋓
 
-(define-metafunction Simple+Γ
+(define-metafunction Oxide+Γ
   ⋓ : Γr Γr -> Γr ;; \Cup : union the loan sets of then and else.
   [(⋓ Γr_1 ()) Γr_1]
   [(⋓ () Γr_2) Γr_2]
@@ -310,14 +311,22 @@
        (r_rest2 ↦ loans_rest2) ...))
    (insert-rgn r (⋃ loans_1 loans_2)
                (⋓ ((r_rest1 ↦ loans_rest1) ...)
-                  ((r_before2 ↦ loans_before2) ... (r_rest2 ↦ loans_rest2) ...)))])
-
+                  ((r_before2 ↦ loans_before2) ... (r_rest2 ↦ loans_rest2) ...)))]
+  [(⋓ ((r ↦ loans)
+       (r_rest ↦ loans_rest) ...)
+      ((r_other ↦ loans_other) ...))
+   (⋓ ((r_rest ↦ loans_rest) ...)
+      ((r ↦ loans) (r_other ↦ loans_other) ...))]
+  )
 
 ;; Tests for ⋓
 (test-equal
  (term (⋓ [(r1 ↦ {(unique x)})] [(r1 ↦ {(unique y)})]))
  (term [(r1 ↦ {(unique x) (unique y)})]))
 
+(test-equal
+ (term (⋓ [(r1 ↦ {(unique x)})] [(r2 ↦ {(unique y)})]))
+ (term [(r1 ↦ {(unique x)}) (r2 ↦ {(unique y)})]))
 
 ;; END ⋓
 
@@ -391,6 +400,19 @@
  #false)
 
 (test-judgment-holds
+ (⊢ Γ_empty
+    (letvar x : int = 0
+            (letrgn
+             [r1]
+             (letrgn
+              [r2]
+              (letvar
+               y : (& r1 shared int) = (& r1 shared x)
+               (letvar z : (& r2 shared int) = (& r2 shared x) y)))))
+    (& r shared int)
+    any))
+
+(test-judgment-holds
  (⊢ ({(x : int)} {(r ↦ ())})
     (& r unique x)
     (& r unique int)
@@ -398,16 +420,40 @@
 
 (test-judgment-holds
  (⊢ Γ_empty
-    (letvar x : int = 0
-            (letrgn [r1]
-                    (letrgn [r2]
-                            (if x
-                                (letvar y : (& r1 unique int) = (& r1 unique x) 100)
-                                200
-                                ;; (letvar z : (& r2 unique int) = (& r2 unique x) 200)
-                                ))))
+    (if false 100 200)
     int
-    any))
+    Γ))
+
+(test-judgment-holds
+ (⊢ Γ_empty
+    (letvar x : int = 0
+            (letrgn
+             [r1]
+             (letrgn
+              [r2]
+              (if false
+                  (letvar y : (& r1 unique int) = (& r1 unique x) 100)
+                  (letvar z : (& r2 unique int) = (& r2 unique x) 200)
+                  ))))
+    int
+    Γ))
+
+(test-match
+ Oxide+Γ
+ (letvar x : t = e_1 e_2)
+ (term  (letvar y : (& r1 unique int) = (& r1 unique x) 100)))
+      ;; )))
+
+(test-match Oxide+Γ
+            (if e_1 e_2 e_3)
+            (term (if x
+                      (letvar y : (& r1 unique int) = (& r1 unique x) 100)
+                      200
+                      ))
+            )
+
+;; (test-match Oxide+Γ (letvar x : t = e_bind e_body)
+;; (term (letvar y : (& r1 unique int) = (& r1 unique x) 100)))
 
 
 (test-results)
