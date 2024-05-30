@@ -17,10 +17,13 @@
      (& r ω x)
 
      ;; Variable binding.
-     (letvar x : t = e e) ;; bind x of type τ to the result of e, place at ρ
+     (let (x : t = e) e) ;; bind x of type τ to the result of e, place at ρ
 
      ;; Region binding.
      (letrgn [r] e)
+
+     ;; Drop the first e, then evaluate to the second e.
+     (drop e e)
 
      ;; Reference access.
      (set x e e)
@@ -63,10 +66,10 @@
 
   ;; Types
   (t ::=
-     unit      ;; unit type
-     int       ;; integer type
-     bool      ;; boolean type
-     (& ρ ω t)) ;; reference type
+     unit       ;; unit type
+     int        ;; integer type
+     bool       ;; boolean type
+     (& ρ ω t)) ;; Reference typing
 
      ;; α              ;; type variable
      ;; ((t ...) -> t) ;; function type
@@ -74,7 +77,7 @@
 
 
   #:binding-forms
-  (letvar x : t = e e #:refers-to x)
+  (let (x : t = e) e #:refers-to x)
   (letrgn [r] e #:refers-to r))
 
 
@@ -139,7 +142,7 @@
   [(⊢ (Γv Γr) e_bind t (Γv_bind Γr_bind))
    (⊢ (extend-var x t (Γv Γr_bind)) e_body t_body (Γv_body Γr_body))
    ----------------------------------------------------------------- "variable declaration"
-   (⊢ (Γv Γr) (letvar x : t = e_bind e_body) t_body (Γv Γr_body))]
+   (⊢ (Γv Γr) (let (x : t = e_bind) e_body) t_body (Γv Γr_body))]
 
   [(⊢ (extend-rgn r {} Γ) e t Γ_e)
    ---------------------------------------- "region binding"
@@ -156,6 +159,20 @@
    (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))])
 
 
+  ;; [(...)
+  ;;  ----------------- "T-Drop"
+  ;;  (⊢ (Γv Γr) (drop e_drop e_rest) t_rest Γ_f)])
+
+
+
+
+
+(define-judgment-form Oxide+Γ
+  #:mode (typeof I O)
+  #:contract (typeof e t)
+  [(⊢ (() ()) e t Γ_out)
+   ----------------- "Typeof"
+   (typeof e t)])
 
 
 (define-judgment-form Oxide+Γ
@@ -174,6 +191,7 @@
    ;; (side-condition (∃π (Γv Γr)
    ;; -------------------------------------- "O-SafePlace-Exclusion"
    ;; (⊢ω (Γv Γr) πs ω p {(ω p)})]
+
 
 
 
@@ -208,6 +226,7 @@
 
 
 ;; Tests for ∀# metafunction
+
 (test-equal
  (term (∀# unique x {(r ↦ [(unique x)])}))
  #f)
@@ -353,34 +372,28 @@
 (test-judgment-holds (⊢ Γ_empty 1 int any))
 (test-judgment-holds (⊢ Γ_empty true bool any))
 (test-judgment-holds (⊢ Γ_empty false bool any))
-(test-judgment-holds (⊢ Γ_empty (letvar x : int = 1 x) int any))
-(test-judgment-holds (⊢ Γ_empty (letvar x : bool = false x) bool any))
+(test-judgment-holds (⊢ Γ_empty (let (x : int = 1) x) int any))
+(test-judgment-holds (⊢ Γ_empty (let (x : bool = false) x) bool any))
 (test-judgment-holds (⊢ Γ_empty
-                        (letvar x : bool = false (letvar y : bool = true x))
+                        (let (x : bool = false)
+                            (let (y : bool = true)
+                                x))
                         bool
                         any))
 (test-judgment-holds (⊢ Γ_empty
-                        (letvar x : bool = true (if x 100 200))
+                        (let (x : bool = true) (if x 100 200))
                         int
                         any))
 
-;; #;(test-judgment-holds (⊢ Γ_empty
-;;                         (letrgn [rz]
-;;                                 (letvar x : bool = true
-;;                                         (letvar y : bool = false
-;;                                                 (letvar z : (& rz unique bool) = (if x (& rz unique x) (& rz unique y))
-;;                                                         z))))
-;;                         (& r unique bool)
-;;                         any))
 
 (test-equal
- (judgment-holds (⊢ Γ_empty (letvar x : int = false x) bool any))
+ (judgment-holds (⊢ Γ_empty (let (x : int = false) x) bool any))
  #false)
 
 ;; References
 (test-judgment-holds (⊢ Γ_empty
-                        (letvar x : int = 0
-                                (letrgn [r1] (& r1 unique x)))
+                        (let (x : int = 0)
+                           (letrgn [r1] (& r1 unique x)))
                         (& r unique int)
                         any))
 
@@ -388,14 +401,14 @@
 ;; Then, we need to make this test pass by seeing that r1 is dropped once r2 borrows x.
 ;; (test-judgment-holds
 ;;  (⊢ Γ_empty
-;;     (letvar x : int = 0
+;;     (let (x : int = 0)
 ;;             (letrgn
 ;;              [r1]
 ;;              (letrgn
 ;;               [r2]
-;;               (letvar
-;;                y : (& r1 unique int) = (& r1 unique x)
-;;                (letvar z : (& r2 unique int) = (& r2 unique x) z)))))
+;;               (let
+;;                (y : (& r1 unique int) = (& r1 unique x))
+;;                (let (z : (& r2 unique int) = (& r2 unique x)) z)))))
 ;;     (& r unique int)
 ;;     any))
 
@@ -403,28 +416,26 @@
 (test-equal
  (judgment-holds
   (⊢ Γ_empty
-     (letvar x : int = 0
-             (letrgn
-              [r1]
-              (letrgn
-               [r2]
-               (letvar
-                y : (& r1 unique int) = (& r1 unique x)
-                (letvar z : (& r2 unique int) = (& r2 unique x) y)))))
+     (let (x : int = 0)
+        (letrgn
+         [r1]
+         (letrgn
+          [r2]
+          (let (y : (& r1 unique int) = (& r1 unique x))
+           (let (z : (& r2 unique int) = (& r2 unique x))
+              y)))))
      (& r unique int)
      any))
  #false)
 
 (test-judgment-holds
  (⊢ Γ_empty
-    (letvar x : int = 0
-            (letrgn
-             [r1]
-             (letrgn
-              [r2]
-              (letvar
-               y : (& r1 shared int) = (& r1 shared x)
-               (letvar z : (& r2 shared int) = (& r2 shared x) y)))))
+    (let (x : int = 0)
+       (letrgn [r1]
+        (letrgn [r2]
+         (let (y : (& r1 shared int) = (& r1 shared x))
+           (let (z : (& r2 shared int) = (& r2 shared x))
+              y)))))
     (& r shared int)
     any))
 
@@ -436,14 +447,14 @@
 
 (test-judgment-holds
  (⊢ Γ_empty
-    (letvar x : int = 0
-            (letrgn
-             [r1]
-             (letrgn
-              [r2]
-              (if false
-                  (letvar y : (& r1 unique int) = (& r1 unique x) 100)
-                  (letvar z : (& r2 unique int) = (& r2 unique x) 200)))))
+    (let (x : int = 0)
+       (letrgn [r1]
+         (letrgn [r2]
+           (if false
+               (let (y : (& r1 unique int) = (& r1 unique x))
+                  100)
+               (let (z : (& r2 unique int) = (& r2 unique x))
+                  200)))))
 
     int
     Γ))
@@ -451,41 +462,37 @@
 
 (test-judgment-holds
  (⊢ Γ_empty
-    (letvar x : int = 0
-            (letrgn
-             [r1]
-             (letvar y : (& r1 unique int) = (& r1 unique x)
-                     (set y 100 (get y)))))
+    (let (x : int = 0)
+       (letrgn [r1]
+          (let (y : (& r1 unique int) = (& r1 unique x))
+             (set y 100 (get y)))))
     int
     Γ))
 
 (test-judgment-holds
  (⊢ Γ_empty
-    (letvar x : int = 0
-            (letvar y : int =
-                    (letrgn [r1] (letvar ref1 : (& r1 unique int) =
-                                         (& r1 unique x)
-                                         (set ref1 100 (get ref1))))
-                    (letrgn [r2] (letvar ref2 : (& r2 unique int) =
-                                         (& r2 unique x)
-                                         (set ref2 200 (get ref2))))))
+    (let (x : int = 0)
+       (let (y : int = (letrgn [r1] (let (ref1 : (& r1 unique int) = (& r1 unique x))
+                                       (set ref1 100 (get ref1)))))
+          (letrgn [r2] (let (ref2 : (& r2 unique int) = (& r2 unique x))
+                          (set ref2 200 (get ref2))))))
     int
     Γ))
 
 (test-equal
  (judgment-holds
   (⊢ Γ_empty
-     (letvar x : int = 0
-             (letrgn
-              [r1]
-              (letvar y : (& r1 shared int) = (& r1 shared x)
-                      (set y 100 (get y)))))
+     (let (x : int = 0)
+        (letrgn [r1]
+         (let (y : (& r1 shared int) = (& r1 shared x))
+            (set y 100 (get y)))))
      int
      Γ))
  #f)
 
-;; (test-match Oxide+Γ (letvar x : t = e_bind e_body)
-;; (term (letvar y : (& r1 unique int) = (& r1 unique x) 100)))
 
+
+(test-judgment-holds (typeof 1 int))
+(test-judgment-holds (typeof 1 int))
 
 (test-results)
