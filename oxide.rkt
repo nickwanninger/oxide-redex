@@ -27,12 +27,11 @@
      (get x)
 
      ;; Structured control flow
-     (if e e e)   ;; predication, "the only interesting thing"
+     (if e e e))   ;; predication, "the only interesting thing"
      ;;                             -Christos Dimoulas, Ph.D.
      ;;                               5/9/2024
 
 
-     )
 
 
   ;; Constants
@@ -43,7 +42,6 @@
   (p ::=
      x      ;; variable
      (* p)) ;; dereference
-     ;; (. p i) ;; tuple indexing
 
 
   ;; Variables.
@@ -155,8 +153,8 @@
    (⊢ (Γv Γr) e_then t (Γv_then Γr_then))
    (⊢ (Γv Γr) e_else t (Γv_else Γr_else))
    ----------------------------------------------------------------- "branch"
-   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))]
-  )
+   (⊢ (Γv Γr) (if e_cond e_then e_else) t (Γv (⋓ Γr_then Γr_else)))])
+
 
 
 
@@ -209,7 +207,7 @@
   [(∀# ω p {}) #t])
 
 
-;; Tests for ∀#
+;; Tests for ∀# metafunction
 (test-equal
  (term (∀# unique x {(r ↦ [(unique x)])}))
  #f)
@@ -223,7 +221,7 @@
  (term (∀# shared x {(r ↦ [(unique x)])}))
  #f)
 
-;; END ∀#
+;; END ∀# metafunction
 
 ;; START ∃π
 ;; (define-metafunction Oxide+Γ
@@ -280,8 +278,8 @@
                 ((r ↦ loans) (r_2 ↦ loans_2) ...)))
    loans]
   [(lookup-rgn r (Γv ((r_1 ↦ loans_1) (r_2 ↦ loans_2) ...)))
-   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))]
-  )
+   (lookup-rgn r (Γv ((r_2 ↦ loans_2) ...)))])
+
 
 
 (define-metafunction Oxide+Γ
@@ -334,8 +332,8 @@
        (r_rest ↦ loans_rest) ...)
       ((r_other ↦ loans_other) ...))
    (⋓ ((r_rest ↦ loans_rest) ...)
-      ((r ↦ loans) (r_other ↦ loans_other) ...))]
-  )
+      ((r ↦ loans) (r_other ↦ loans_other) ...))])
+
 
 ;; Tests for ⋓
 (test-equal
@@ -445,8 +443,8 @@
               [r2]
               (if false
                   (letvar y : (& r1 unique int) = (& r1 unique x) 100)
-                  (letvar z : (& r2 unique int) = (& r2 unique x) 200)
-                  ))))
+                  (letvar z : (& r2 unique int) = (& r2 unique x) 200)))))
+
     int
     Γ))
 
